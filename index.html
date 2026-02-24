@@ -92,12 +92,14 @@ async function connect() {
     provider = new ethers.BrowserProvider(window.ethereum);
 
     await provider.send("eth_requestAccounts", []);
+
+    await checkNetwork(); // <-- switch first
+
     signer = await provider.getSigner();
     userAddress = await signer.getAddress();
 
     contract = new ethers.Contract(contractAddress, abi, signer);
 
-    checkNetwork();
     checkOwner();
     updateCounters();
 }
