@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>Red or Blue</title>
 
-    <!-- ✅ Use ethers v5 UMD (works in normal HTML) -->
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 
     <style>
@@ -38,6 +37,12 @@
             font-size: 20px;
             margin: 10px;
         }
+
+        #wallet {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #333;
+        }
     </style>
 </head>
 
@@ -46,7 +51,8 @@
 <h1>RED OR BLUE</h1>
 <h3>Make your choice!</h3>
 
-<!-- Replace robot.jpg with your image filename -->
+<div id="wallet">Wallet: Not connected</div>
+
 <img src="robot.jpg" alt="Robot offering red and blue pill">
 
 <div>
@@ -68,48 +74,16 @@
 
 <script>
 
-//////////////////////////////
-// CONTRACT CONFIGURATION
-//////////////////////////////
-
-const contractAddress = "0x3254f6bb96420F601b859b6dA32799f4CE8271f0";
+const contractAddress = "0xb0794505C0158D5400476CE551194A8272DF4AD3";
 
 const abi = [
-	{ "inputs": [], "name": "reset", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
-	{ "inputs": [], "stateMutability": "nonpayable", "type": "constructor" },
-	{ "inputs": [], "name": "voteBlue", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
-	{ "inputs": [], "name": "voteRed", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
-	{
-		"inputs": [],
-		"name": "blueVotes",
-		"outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [{ "internalType": "address", "name": "", "type": "address" }],
-		"name": "hasVoted",
-		"outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "owner",
-		"outputs": [{ "internalType": "address", "name": "", "type": "address" }],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "redVotes",
-		"outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-		"stateMutability": "view",
-		"type": "function"
-	}
+    { "inputs": [], "name": "reset", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+    { "inputs": [], "name": "voteBlue", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+    { "inputs": [], "name": "voteRed", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+    { "inputs": [], "name": "blueVotes", "outputs": [{ "type": "uint256" }], "stateMutability": "view", "type": "function" },
+    { "inputs": [], "name": "redVotes", "outputs": [{ "type": "uint256" }], "stateMutability": "view", "type": "function" },
+    { "inputs": [], "name": "owner", "outputs": [{ "type": "address" }], "stateMutability": "view", "type": "function" }
 ];
-
-//////////////////////////////
 
 let provider;
 let signer;
@@ -119,18 +93,22 @@ let userAddress;
 async function connect() {
 
     if (!window.ethereum) {
-        alert("Please install MetaMask.");
+        alert("Install MetaMask.");
         return;
     }
 
     provider = new ethers.providers.Web3Provider(window.ethereum);
 
     await provider.send("eth_requestAccounts", []);
-
     await switchToSepolia();
 
     signer = provider.getSigner();
     userAddress = await signer.getAddress();
+
+    document.getElementById("wallet").innerText =
+        "Connected wallet: " +
+        userAddress.substring(0,6) + "..." +
+        userAddress.substring(userAddress.length - 4);
 
     contract = new ethers.Contract(contractAddress, abi, signer);
 
@@ -138,43 +116,18 @@ async function connect() {
     await updateCounters();
 }
 
-////////////////////////////////////////////
-// Automatically switch to Sepolia
-////////////////////////////////////////////
-
 async function switchToSepolia() {
-
-    const sepoliaChainId = "0xaa36a7"; // 11155111 in hex
+    const chainId = "0xaa36a7";
 
     try {
         await window.ethereum.request({
             method: "wallet_switchEthereumChain",
-            params: [{ chainId: sepoliaChainId }]
+            params: [{ chainId }]
         });
     } catch (error) {
-
-        if (error.code === 4902) {
-            await window.ethereum.request({
-                method: "wallet_addEthereumChain",
-                params: [{
-                    chainId: sepoliaChainId,
-                    chainName: "Sepolia",
-                    nativeCurrency: {
-                        name: "Sepolia ETH",
-                        symbol: "ETH",
-                        decimals: 18
-                    },
-                    rpcUrls: ["https://rpc.sepolia.org"],
-                    blockExplorerUrls: ["https://sepolia.etherscan.io"]
-                }]
-            });
-        } else {
-            console.error(error);
-        }
+        console.error(error);
     }
 }
-
-////////////////////////////////////////////
 
 async function updateCounters() {
     const red = await contract.redVotes();
@@ -189,8 +142,8 @@ async function voteRed() {
         const tx = await contract.voteRed();
         await tx.wait();
         updateCounters();
-    } catch (err) {
-        alert("Transaction failed (maybe already voted).");
+    } catch {
+        alert("Already voted this round.");
     }
 }
 
@@ -199,8 +152,8 @@ async function voteBlue() {
         const tx = await contract.voteBlue();
         await tx.wait();
         updateCounters();
-    } catch (err) {
-        alert("Transaction failed (maybe already voted).");
+    } catch {
+        alert("Already voted this round.");
     }
 }
 
@@ -213,13 +166,9 @@ async function checkOwner() {
 }
 
 async function resetVotes() {
-    try {
-        const tx = await contract.reset();
-        await tx.wait();
-        updateCounters();
-    } catch (err) {
-        alert("Only contract owner can reset.");
-    }
+    const tx = await contract.reset();
+    await tx.wait();
+    updateCounters();
 }
 
 document.getElementById("redBtn").onclick = voteRed;
