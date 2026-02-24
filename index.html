@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Red or Blue</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.10.0/dist/ethers.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+        }
+
+        h1 { margin-top: 20px; }
+
+        img {
+            width: 320px;
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 12px 25px;
+            font-size: 16px;
+            margin: 10px;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+        }
+
+        #redBtn { background-color: #ff4d4d; color: white; }
+        #blueBtn { background-color: #4d79ff; color: white; }
+        #resetBtn { background-color: black; color: white; }
+
+        .counter {
+            font-size: 20px;
+            margin: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>RED OR BLUE</h1>
+<h3>Make your choice!</h3>
+
+<!-- Replace with your image filename -->
+<img src="robot.jpg" alt="Robot offering red and blue pill">
+
+<div>
+    <button id="redBtn">Vote RED</button>
+    <button id="blueBtn">Vote BLUE</button>
+</div>
+
+<div class="counter">
+    Total RED votes: <span id="redCount">0</span>
+</div>
+
+<div class="counter">
+    Total BLUE votes: <span id="blueCount">0</span>
+</div>
+
+<div>
+    <button id="resetBtn" disabled>RESET</button>
+</div>
+
+<script>
+
+const contractAddress = "0x3254f6bb96420F601b859b6dA32799f4CE8271f0";
+
+const abi = [
+    "function redVotes() view returns (uint)",
+    "function blueVotes() view returns (uint)",
+    "function voteRed()",
+    "function voteBlue()",
+    "function reset()",
+    "function owner() view returns (address)"
+];
+
+let provider;
+let signer;
+let contract;
+let userAddress;
+
+async function connect() {
+
+    if (!window.ethereum) {
+        alert("Please install MetaMask.");
+        return;
+    }
+
+    provider = new ethers.BrowserProvider(window.ethereum);
+
+    await provider.send("eth_requestAccounts", []);
+    signer = await provider.getSigner();
+    userAddress = await signer.getAddress();
+
+    contract = new ethers.Contract(contractAddress, abi, signer);
+
+    checkNetwork();
+    checkOwner();
+    updateCounters();
+}
+
+async function checkNetwork() {
+    const network = await provider.getNetwork();
+    if (network.chainId !== 11155111n) {
+        alert("Please switch MetaMask to Sepolia network.");
+    }
+}
+
+async function updateCounters() {
+    const red = await contract.redVotes();
+    const blue = await contract.blueVotes();
+
+    document.getElementById("redCount").innerText = red;
+    document.getElementById("blueCount").innerText = blue;
+}
+
+async function voteRed() {
+    try {
+        const tx = await contract.voteRed();
+        await tx.wait();
+        updateCounters();
+    } catch (err) {
+        alert("Transaction failed (maybe already voted).");
+    }
+}
+
+async function voteBlue() {
+    try {
+        const tx = await contract.voteBlue();
+        await tx.wait();
+        updateCounters();
+    } catch (err) {
+        alert("Transaction failed (maybe already voted).");
+    }
+}
+
+async function checkOwner() {
+    const owner = await contract.owner();
+
+    if (owner.toLowerCase() === userAddress.toLowerCase()) {
+        document.getElementById("resetBtn").disabled = false;
+    }
+}
+
+async function resetVotes() {
+    try {
+        const tx = await contract.reset();
+        await tx.wait();
+        updateCounters();
+    } catch (err) {
+        alert("Only contract owner can reset.");
+    }
+}
+
+document.getElementById("redBtn").onclick = voteRed;
+document.getElementById("blueBtn").onclick = voteBlue;
+document.getElementById("resetBtn").onclick = resetVotes;
+
+connect();
+
+</script>
+
+</body>
+</html>
