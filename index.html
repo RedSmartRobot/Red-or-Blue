@@ -103,9 +103,34 @@ async function connect() {
 }
 
 async function checkNetwork() {
-    const network = await provider.getNetwork();
-    if (network.chainId !== 11155111n) {
-        alert("Please switch MetaMask to Sepolia network.");
+    const sepoliaChainId = "0xaa36a7"; // 11155111 in hex
+
+    try {
+        await window.ethereum.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: sepoliaChainId }]
+        });
+    } catch (switchError) {
+
+        // If Sepolia is not added in MetaMask
+        if (switchError.code === 4902) {
+            await window.ethereum.request({
+                method: "wallet_addEthereumChain",
+                params: [{
+                    chainId: sepoliaChainId,
+                    chainName: "Sepolia",
+                    nativeCurrency: {
+                        name: "Sepolia ETH",
+                        symbol: "ETH",
+                        decimals: 18
+                    },
+                    rpcUrls: ["https://rpc.sepolia.org"],
+                    blockExplorerUrls: ["https://sepolia.etherscan.io"]
+                }]
+            });
+        } else {
+            console.error(switchError);
+        }
     }
 }
 
